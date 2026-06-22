@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { initSubagents, runSubagents } from "./patterns/subagents.js";
 import { initRouter, runRouter } from "./patterns/router.js";
+import { initHandoffs, runHandoffs } from "./patterns/handoffs.js";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -24,7 +25,7 @@ app.get("/health", (_req, res) => {
     patterns: {
       subagents: "POST /v1/subagents/chat",
       router: "POST /v1/router/chat",
-      handoffs: "POST /v1/handoffs/chat (Day 2)",
+      handoffs: "POST /v1/handoffs/chat",
       skills: "POST /v1/skills/chat (Day 2)",
       workflow: "POST /v1/workflow/chat (Day 2)",
     },
@@ -60,11 +61,25 @@ app.post("/v1/router/chat", requireApiKey, async (req, res) => {
   }
 });
 
+app.post("/v1/handoffs/chat", requireApiKey, async (req, res) => {
+  try {
+    const message = String(req.body?.message ?? "").trim();
+    if (!message) return res.status(400).json({ error: "message is required" });
+    const threadId = String(req.body?.threadId ?? randomUUID());
+    res.json(await runHandoffs({ message, threadId }));
+  } catch (err) {
+    console.error("handoffs", err);
+    res.status(500).json({ error: "Handoffs failed", detail: err.message });
+  }
+});
+
 await initSubagents();
 initRouter();
+initHandoffs();
 
 app.listen(config.port, () => {
   console.log(`Multi-agent hub http://localhost:${config.port}`);
   console.log("  POST /v1/subagents/chat");
   console.log("  POST /v1/router/chat");
+  console.log("  POST /v1/handoffs/chat");
 });
